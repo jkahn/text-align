@@ -6,16 +6,18 @@ use warnings;
 our @ISA;
 our @EXPORT_OK = ( qw( distance ) );
 our @EXPORT = qw();
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 ##################################################################
 require Exporter;
 use base 'Text::Align';
 push @ISA, qw(Exporter);
 use Carp;
 ##################################################################
-use constant _MATCH => __PACKAGE__ . '::match';
-use constant _INDEL => __PACKAGE__ . '::indel';
-use constant _SUBSTITUTION => __PACKAGE__ . '::substitution';
+use constant MATCH => 0;
+use constant INDEL => 1;
+use constant SUBSTITUTION => 2;
+##################################################################
+my %weights; # inside-out hash -- maps ids to weights
 ##################################################################
 sub init {
     my ($self, %args) = @_;
@@ -29,21 +31,23 @@ sub init {
     }
 
     my ($match, $indel, $substitute) = @{$weightref};
-    $self->{_MATCH()} = $match;
-    $self->{_INDEL()} = $indel;
-    $self->{_SUBSTITUTION()} = $substitute;
+    my $id = $self->id();
+    $weights{$id}[MATCH] = $match;
+    $weights{$id}[INDEL] = $indel;
+    $weights{$id}[SUBSTITUTION] = $substitute;
 }
 ##################################################################
 sub weighter {
     my ($self, $left, $right, $actionref) = @_;
+    my $id = $self->id();
     if (not defined $left or not defined $right) {
-	return $self->{_INDEL()};
+	return $weights{$id}[INDEL];
     }
     elsif ($left eq $right) {
-	return $self->{_MATCH()};
+	return $weights{$id}[MATCH];
     }
     else {
-	return $self->{_SUBSTITUTION()};
+	return $weights{$id}[SUBSTITUTION];
     }
 }
 ##################################################################
@@ -156,8 +160,15 @@ Original version; created by h2xs 1.21 with options
   -CAX
 	Text::Align::WagnerFischer
 
-=back
+=item 0.02
 
+revised to use array internally, and to use private hash of weights
+(so that base class infrastructure doesn't influence anything here).
+
+See "inside-out objects" at
+L<http://www.perlmonks.org/index.pl?node_id=189791> for more on this strategy.
+
+=back
 
 =head1 AUTHOR
 

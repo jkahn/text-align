@@ -3,7 +3,7 @@
 use 5.006;
 use strict;
 use warnings;
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 ##################################################################
 use Carp;
 use utf8; # character semantics, please
@@ -14,25 +14,31 @@ use utf8; # character semantics, please
 # 'em (by accident) if we give nice complex names like this
 
 # dynamic -- used during alignment
-use constant _ACTIONS => __PACKAGE__ . "::actions";
+use constant ACTIONS => 0;
 # the current cell being evaluated
-use constant _POSX => __PACKAGE__ . "::posx";
-use constant _POSY => __PACKAGE__ . "::posy";
+use constant POS_X => 1;
+use constant POS_Y => 2;
 # the current position of the backtrace
-use constant _CURRTRACE => __PACKAGE__ . '::currtrace';
-use constant _BTX => __PACKAGE__ . "::btx";
-use constant _BTY => __PACKAGE__ . "::bty";
+use constant CURRTRACE => 3;
+use constant BT_X => 4;
+use constant BT_Y => 5;
 
 # the results
-use constant _PATH => __PACKAGE__ . "::path"; # key for arrayref
-use constant _COST => __PACKAGE__ . "::cost"; # key for scalar value
+use constant PATH => 6;
+use constant COST => 7;
 # keys for the items compared themselves
-use constant _LEFT => __PACKAGE__ . "::left";
-use constant _RIGHT => __PACKAGE__ . "::right";
+use constant LEFT => 8;
+use constant RIGHT => 9;
 
+# ID key for subclasses (which should maintain their own data hashes)
+use constant ID => 10;
+
+# boolean trace helper (debugging aid; turn on for easier debugging)
 use constant TRACE_WEIGHTS => 0;
 ##################################################################
 # CLASS METHODS
+##################################################################
+my @ids = ();
 ##################################################################
 sub costs {
     my $class = shift;
@@ -53,12 +59,19 @@ sub costs {
     }
 }
 ##################################################################
+sub reset_class {
+    @ids = ();
+}
+##################################################################
 # CONSTRUCTOR
 ##################################################################
 sub new {
     my $class = shift;
     my (%args) = @_;
-    my ($self) = {};
+    my ($self) = [];
+    $self->[PATH] = [];
+    $self->[LEFT] = [];
+    $self->[RIGHT] = [];
     bless $self, $class;
 
     # check for user mistakes -- forgot to include a param?
@@ -69,6 +82,9 @@ sub new {
 	croak "no right key provided to new()";
     }
 
+    $self->[ID] = scalar @ids;
+    push @ids, $self;
+
     $self->init(%args);
     $self->align($args{left}, $args{right});
 
@@ -77,14 +93,16 @@ sub new {
 ##################################################################
 # accessor methods - primitives
 ##################################################################
+sub id {
+    return $_[0]->[ID];
+}
+##################################################################
 sub pairwise {
-    my $self = shift;
-    return @{$self->{_PATH()}};
+    return @{$_[0]->[PATH]};
 }
 ##################################################################
 sub cost {
-    my $self = shift;
-    return $self->{_COST()};
+    return $_[0]->[COST];
 }
 ##################################################################
 sub as_lists {
@@ -220,26 +238,26 @@ sub align {
     # we'll leave it alone.
     if ( not ref $left ) {
 	# user gave a string; split it!
-	$self->{_LEFT()} = [ split (//, $left) ];
+	$self->[LEFT] = [ split (//, $left) ];
     }
     elsif ( not UNIVERSAL::isa($left, 'ARRAY') ) {
 	require Carp;
 	croak "left value provided was a reference, but not an arrayref!";
     }
     else {
-	$self->{_LEFT()} = $left;
+	$self->[LEFT] = $left;
     }
     # same again for right side.
     if ( not ref $right ) {
 	# user gave a string; split it!
-	$self->{_RIGHT()} = [ split (//, $right) ];
+	$self->[RIGHT] = [ split (//, $right) ];
     }
     elsif ( not UNIVERSAL::isa($right, 'ARRAY') ) {
 	require Carp;
 	croak "right value provided was a reference, but not an arrayref!";
     }
     else {
-	$self->{_RIGHT()} = $right;
+	$self->[RIGHT] = $right;
     }
 
     # actually do the alignment!
@@ -262,8 +280,8 @@ sub _align {
 #     # lookup on every single cell.
 #     my $weighter = $self->can('weighter');
 
-    my (@left)   = @{$self->{_LEFT()}};
-    my (@right)  = @{$self->{_RIGHT()}};
+    my (@left)   = @{$self->[LEFT]};
+    my (@right)  = @{$self->[RIGHT]};
 
     # put the anchoring boundary pseudo-tokens in as the first
     # item. They are both undef, since there is absolutely no
@@ -281,33 +299,33 @@ sub _align {
     $costs[0][0] = 0; # these are the mock-match pseudo-anchors, and
                       # since $weighter->(undef, undef) is undefined,
                       # set this now.
-    $self->{_ACTIONS()}[0][0] =
+    $self->[ACTIONS][0][0] =
       [undef,undef];
 
     # initialize edge cells
-    $self->{_POSY()} = 0;
+    $self->[POS_Y] = 0;
     for my $x (1 .. $#left) {
 	# all deletions up to $x
-	$self->{_POSX()} = $x;
+	$self->[POS_X] = $x;
 	my $cost = $self->_getWeight($left[$x], undef) + $costs[$x-1][0];
 	my $action = [ $left[$x], undef ];
 
 	$costs[$x][0] = $cost;
-	$self->{_ACTIONS()}[$x][0] = $action;
+	$self->[ACTIONS][$x][0] = $action;
 
 	if (TRACE_WEIGHTS) {
 	    $self->dump_trace($x, 0, \@left, \@right, $action, $cost);
 	}
     }
-    $self->{_POSX()} = 0;
+    $self->[POS_X] = 0;
     for my $y (1 .. $#right) {
 	# all insertions up to $y
-	$self->{_POSY()} = $y;
+	$self->[POS_Y] = $y;
 	my $cost = $self->_getWeight(undef, $right[$y]) + $costs[0][$y-1];
 	  my $action = [ undef, $right[$y] ];
 
 	$costs[0][$y] = $cost;
-	$self->{_ACTIONS()}[0][$y] = $action;
+	$self->[ACTIONS][0][$y] = $action;
 
 	if (TRACE_WEIGHTS) {
 	    $self->dump_trace(0, $y, \@left, \@right, $action, $cost);
@@ -317,10 +335,10 @@ sub _align {
     # set inside cells based on their neighbors, who are now
     # guaranteed to exist
     for my $x (1 .. $#left) {
-	$self->{_POSX()} = $x;
+	$self->[POS_X] = $x;
 	for my $y (1 .. $#right) {
 	    # work the dp algorithm for each interior cell
-	    $self->{_POSY()} = $y;
+	    $self->[POS_Y] = $y;
 
 	    # (1) compare three costs to reach the current cell:
 	    my ($paircost) = # match or substitution
@@ -357,7 +375,7 @@ sub _align {
 	    else {
 		$action = [ undef, $right[$y] ];
 	    }
-	    $self->{_ACTIONS()}[$x][$y] = $action;
+	    $self->[ACTIONS][$x][$y] = $action;
 
 	    # (3b) repeat this operation on each cell in the table
 
@@ -370,21 +388,21 @@ sub _align {
     } # for $x
 
     # (4) the best alignment cost is that in the cell farthest from (0,0).
-    $self->{_COST()} = $costs[$#left][$#right];
+    $self->[COST] = $costs[$#left][$#right];
 
     # (5) walk back along the best alignment.
-    @{$self->{_PATH()}} =
-      $self->_backtrace($self->{_POSX()}, $self->{_POSY()});
+    @{$self->[PATH]} =
+      $self->_backtrace($self->[POS_X], $self->[POS_Y]);
 
     # discard dynamic actions record
-    delete $self->{_LEFT()};
-    delete $self->{_RIGHT()};
+    delete $self->[LEFT];
+    delete $self->[RIGHT];
 
-    delete $self->{_ACTIONS()};
-    delete $self->{_POSX()};
-    delete $self->{_POSY()};
-    delete $self->{_BTX()};
-    delete $self->{_BTY()};
+    delete $self->[ACTIONS];
+    delete $self->[POS_X];
+    delete $self->[POS_Y];
+    delete $self->[BT_X];
+    delete $self->[BT_Y];
 }
 ##################################################################
 sub dump_trace {
@@ -414,11 +432,11 @@ sub _backtrace {
     my ($self, $x, $y) = @_;
     croak if (not defined $x or not defined $y);
     # save state:
-    my $oldx = $self->{_BTX()};
-    my $oldy = $self->{_BTY()};
+    my $oldx = $self->[BT_X];
+    my $oldy = $self->[BT_Y];
     # move to state set by argument
-    $self->{_BTX()} = $x;
-    $self->{_BTY()} = $y;
+    $self->[BT_X] = $x;
+    $self->[BT_Y] = $y;
 
     my (@path);
     while (my $step = $self->backstep()) {
@@ -426,8 +444,8 @@ sub _backtrace {
     }
 
     # reset state
-    $self->{_BTX()} = $oldx;
-    $self->{_BTY()} = $oldy;
+    $self->[BT_X] = $oldx;
+    $self->[BT_Y] = $oldy;
     return @path;
 }
 ##################################################################
@@ -438,7 +456,7 @@ sub _getWeight {
     # position
 
     # setup
-    $self->{_CURRTRACE()} = [ $left, $right ];
+    $self->[CURRTRACE] = [ $left, $right ];
 
     $self->reset_backtrace();
 
@@ -446,7 +464,7 @@ sub _getWeight {
     my $result = $self->weighter($left, $right);
 
     # discard setup
-    delete $self->{_CURRTRACE()};
+    delete $self->[CURRTRACE];
 
     if (TRACE_WEIGHTS) {
 	if (not defined $left) {
@@ -465,25 +483,25 @@ sub _getWeight {
 sub reset_backtrace {
     my $self = shift;
 
-    $self->{_BTX()} = $self->{_POSX()};
-    $self->{_BTY()} = $self->{_POSY()};
+    $self->[BT_X] = $self->[POS_X];
+    $self->[BT_Y] = $self->[POS_Y];
 
     croak "can't call reset_backtrace except from within ",
-      "weighter() method implementation" if not defined $self->{_CURRTRACE()};
+      "weighter() method implementation" if not defined $self->[CURRTRACE];
 
     # adjust current 
-    if (not defined $self->{_CURRTRACE()}[0]) {
-	$self->{_BTY()}--;
+    if (not defined $self->[CURRTRACE][0]) {
+	$self->[BT_Y]--;
     }
-    if (not defined $self->{_CURRTRACE()}[1]) {
-	$self->{_BTX()}--;
+    if (not defined $self->[CURRTRACE][1]) {
+	$self->[BT_X]--;
     }
 }
 ##################################################################
 sub backstep {
     my $self = shift;
-    my $x = $self->{_BTX()};
-    my $y = $self->{_BTY()};
+    my $x = $self->[BT_X];
+    my $y = $self->[BT_Y];
 
     croak "how did btx get to be less than 0?" if $x < 0;
     croak "how did bty get to be less than 0?" if $y < 0;
@@ -491,21 +509,21 @@ sub backstep {
     croak "can't call backstep() except from weighting function"
       if (not defined $x or not defined $y);
 
-    my $action = $self->{_ACTIONS()}[$x][$y];
+    my $action = $self->[ACTIONS][$x][$y];
 
     # regardless of which step it was
     if (defined $action->[0] and defined $action->[1]) {
 	# a match/substitution
-	$self->{_BTX()}--;
-	$self->{_BTY()}--;
+	$self->[BT_X]--;
+	$self->[BT_Y]--;
     }
     elsif (defined $action->[0]) {
 	# a deletion
-	$self->{_BTX()}--;
+	$self->[BT_X]--;
     }
     elsif (defined $action->[1]) {
 	# an insertion
-	$self->{_BTY()}--;
+	$self->[BT_Y]--;
     }
     else {
 	return (); # we must be at the anchor pseudo-match
@@ -930,6 +948,15 @@ guaranteed to the subclass by the contract.
 
 =over
 
+=item id()
+
+Returns is a unique positive integer. Useful for storing inside-out
+object information (see
+L<http://www.perlmonks.org/index.pl?node_id=189791> on Perlmonks for
+more on this subject)
+
+Takes no arguments.
+
 =item pairwise()
 
 Returns the alignment as a list of 2-element list references. Each
@@ -1117,6 +1144,22 @@ L<Text::Align::background>.
 
 Expanded documentation (L<Text::Align::analysis>), established grouped
 C<scripts> directory for analysis.
+
+=item 0.07
+
+=over
+
+=item object types now based on array
+
+subclasses should maintain their own inside-out datatables
+
+=item id() and reset_class() now supported
+
+C<id()> method useful for subclasses to create their own datatables
+
+C<reset_class()> clears the id tables
+
+=back
 
 =back
 

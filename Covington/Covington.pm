@@ -4,7 +4,7 @@ use 5.006;
 use strict;
 use warnings;
 ##################################################################
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 use base 'Text::Align';
 use constant _LEFT => 0;
 use constant _RIGHT => 1;
@@ -18,16 +18,17 @@ use constant _CASE_F => 100;
 use constant _CASE_G => 50;
  # G should be 40, but haven't implemented affine gap cost yet
 use constant _CASE_H => 50;
-use constant TRACE_CASES => 0;
+use constant TRACE_CASES => 0; # debugging aid
 ##################################################################
 use Carp;
-use constant _PHONESET => __PACKAGE__ . '::phoneset';
 ##################################################################
 use Text::Align::Phone;
 my @similarityMetric = grep { $_ ne 'long' } @Text::Align::Phone::Features;
+my %phonesets; # maps ids to sets of phone data
 ##################################################################
 sub init {
     my $self = shift;
+    my $id = $self->id();
     my (%args) = @_;
     if (defined $args{phoneset}) {
 	if (not UNIVERSAL::isa($args{phoneset}, 'Lingua::FeatureMatrix')) {
@@ -46,11 +47,15 @@ sub init {
 	}
 	# otherwise, it (phew!) passes.
 
-	$self->{_PHONESET()} = $args{phoneset};
+	$phonesets{$id} = $args{phoneset};
     }
     else {
 	croak __PACKAGE__, " requires a defined 'phoneset' argument!";
     }
+}
+##################################################################
+sub phoneset {
+    return $phonesets{$_[0]->id()};
 }
 ##################################################################
 sub weighter {
@@ -58,10 +63,10 @@ sub weighter {
     my ($left, $right) = @_;
 
     # Covington's weights are described in the POD.
-    if (defined $left and not defined $self->{_PHONESET()}->emes($left)) {
+    if (defined $left and not defined $self->phoneset->emes($left)) {
 	carp "don't recognize phone $left\n";
     }
-    if (defined $right and not defined $self->{_PHONESET()}->emes($right)) {
+    if (defined $right and not defined $self->phoneset->emes($right)) {
 	carp "don't recognize phone $right\n";
     }
 
@@ -166,27 +171,29 @@ sub weighter {
 sub _isConsonant {
     my ($self, $phone) = @_;
 #    print "$phone\n";
-    return ($self->{_PHONESET()}->matchesFeatureClass($phone, 'CONS'));
+
+    return ($self->phoneset->matchesFeatureClass($phone, 'CONS'));
 }
 ##################################################################
 sub _isGlide {
     my ($self, $phone) = @_;
-    return ($self->{_PHONESET()}->matchesFeatureClass($phone, 'GLIDE'));
+    return ($self->phoneset->matchesFeatureClass($phone, 'GLIDE'));
 }
 ##################################################################
 sub _isVowel {
     my ($self, $phone) = @_;
-    return ($self->{_PHONESET()}->matchesFeatureClass($phone, 'VOW'));
+    return ($self->phoneset->matchesFeatureClass($phone, 'VOW'));
 }
 ##################################################################
 sub _matchAllButLength {
     my ($self, $left, $right) = @_;
     my $lf =
-      $self->{_PHONESET()}->emes($left)
+      $self->phoneset->emes($left)
 	->dumpFeaturesToText(@similarityMetric);
     my $rf =
-      $self->{_PHONESET()}->emes($right)
+      $self->phoneset->emes($right)
 	->dumpFeaturesToText(@similarityMetric);
+
     return ($lf eq $rf);
 }
 
@@ -381,6 +388,10 @@ C<Text::Align::Covington_a> package.
 
 =item *
 
+add some basic test code!
+
+=item *
+
 It would be nice if this module did not have so many restrictions on
 the C<Lingua::FeatureMatrix> object, but this would require more
 parameter options.
@@ -413,6 +424,12 @@ Updated documentation, added C<Text::Align::Covington_a> package.
 =item 0.03
 
 Clarified documentation. Moved some of it into C<Text::Align>.
+
+=item 0.04
+
+Revised to use inside-out objects to handle the new array-based code
+
+now stores all phoneset data in private class hash accessed by id() key.
 
 =back
 
