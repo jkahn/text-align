@@ -1,0 +1,352 @@
+#!/usr/nikola/bin/perl
+
+use strict;
+use warnings;
+
+use Getopt::Long;
+use Pod::Usage;
+
+my ( $help, $man );
+my $directinput = 0;
+my $verbose = 0;
+
+my $left_idx;
+my $right_idx;
+
+GetOptions(
+	   'help|?' => \$help,
+	   man      => \$man,
+	   directinput => \$directinput,
+	   'left-index|1=i' => \$Alignment::LEFT_IDX,
+	   'right-index|2=i' => \$Alignment::RIGHT_IDX,
+	   'left-delete-costs=f' => \%Alignment::left_deletion_costs,
+	   'right-delete-costs=f' => \%Alignment::right_deletion_costs,
+	   'verbose+' => \$verbose,
+  ) or pod2usage(2);
+pod2usage(1) if ($help);
+pod2usage( -exitstatus => 0, -verbose => 2 ) if ($man);
+
+if (not defined $Alignment::LEFT_IDX) {
+    warn "no --left index defined, using 1\n" if $verbose;
+    $Alignment::LEFT_IDX = 1;
+}
+if (not defined $Alignment::RIGHT_IDX) {
+    warn "no --right index defined, using 1\n" if $verbose;
+    $Alignment::RIGHT_IDX = 1;
+}
+
+# Correct user interface (one-based) to use zero-based arrays
+$Alignment::LEFT_IDX--;
+$Alignment::RIGHT_IDX--;
+
+
+if (@ARGV == 2) {
+    warn "found two files on commandline @ARGV\n" if $verbose > 1;
+}
+elsif (@ARGV == 1) {
+    warn "only one file @ARGV found on commandline, using STDIN for right\n"
+      if $verbose;
+    push @ARGV, "-";
+}
+elsif (@ARGV > 2) {
+    pod2usage "too many argv elements!";
+}
+else {
+    pod2usage "too few argv elements!";
+}
+
+if ($ARGV[0] eq '-' and $ARGV[1] eq '-') {
+    pod2usage "can't have both args be on STDIN!";
+}
+
+my @left_data = get_data($ARGV[0]);
+my $left_length = @{$left_data[0]};
+
+
+my @right_data = get_data($ARGV[1]);
+my $right_length = @{$right_data[0]};
+
+my @pairs = align (\@left_data, \@right_data);
+
+for (@pairs) {
+    my ($left, $right) = @{$_};
+    if (not defined $left) {
+	my @dummies = map { '---' } (1 .. $left_length);
+	$left = \@dummies;
+    }
+    if (not defined $right) {
+	my @dummies = map { '---' } (1 .. $right_length);
+	$right = \@dummies;
+    }
+
+    print join ("\t", @{$left}, @{$right}), "\n";
+}
+
+sub get_data {
+    my $file = shift;
+    my $fh;
+    if ($file eq '-') {
+	$fh = \*STDIN;
+    }
+    else {
+	open ($fh, "<", $file)
+	  or die "can't open file '$file': $!\n";
+    }
+    my @data = (<$fh>);
+    chomp @data;
+    @data = map { my @A = split; \@A } @data;
+    close $fh
+      or die "can't close file '$file': $!\n";
+
+    my $length = scalar @{$data[0]};
+
+    my $row_idx = 0;
+    for (@data) {
+	$row_idx++;
+
+	if (@{$_} > $length) {
+	    warn "hmm... row $row_idx of file '$file' " .
+	      "seems to have too many entries\n";
+	    warn "row contents: @{$_}\n" if $verbose;
+	}
+	while (@{$_} < $length) {
+	    warn "hmm... row $row_idx of file '$file' ".
+	      "seems to be short some entries; I'm padding it\n";
+	    warn "row contents: @{$_}\n" if $verbose;
+	    push @{$_}, '---';
+	}
+    }
+
+    return @data;
+}
+
+sub align {
+    my ($left, $right) = @_;
+
+    my $aligner = Alignment->new(left => $left,
+				 right => $right);
+
+    if ($verbose) {
+	warn "total alignment cost: " . $aligner->cost() . "\n";
+    }
+    return $aligner->pairwise();
+
+}
+
+package Alignment;
+use base 'Text::Align';
+use strict;
+our $LEFT_IDX;
+our $RIGHT_IDX;
+our %left_deletion_costs;
+our %right_deletion_costs;
+sub weighter {
+    my ($self, $left, $right) = @_;
+    if (not defined $left) {
+	if (defined $right_deletion_costs{$right->[$RIGHT_IDX]}) {
+	    return $right_deletion_costs{$right->[$RIGHT_IDX]};
+	}
+	return 1;
+    }
+    if (not defined $right) {
+	if (defined $left_deletion_costs{$left->[$LEFT_IDX]}) {
+	    return $left_deletion_costs{$left->[$LEFT_IDX]};
+	}
+	return 1;
+    }
+    if (not defined $left->[$LEFT_IDX]) {
+	warn "left idx $LEFT_IDX not defined\n";
+	use Data::Dumper;
+	print STDERR Dumper($left);
+    }
+
+    if ($left->[$LEFT_IDX] eq $right->[$RIGHT_IDX]) {
+	return 0;
+    }
+    return 1.5; # prefer a substitution to 2 deletions, but prefer a
+                # deletion to a substitution?
+}
+
+__END__
+
+=head1 NAME
+
+  align -- does dynamic programming alignment of 2 col-based files
+
+=head1 SYNOPSIS
+
+  align [options] [left-file right-file]
+
+  Options:
+    --left-index I (use field I as index field)
+    --right-index I (use field I as index field)
+
+    --left-delete-costs w=c  (deleting w from left should cost c)
+    --right-delete-costs w=c  (deleting w from right should cost c)
+
+    -1 I    same as --left-index
+    -2 I    same as --right-index
+
+     -help        brief help message
+     -man         full documentation
+    --verbose     more verbose to STDERR
+    --directinput allow TTY to STDIN
+
+=head1 OPTIONS
+
+=over
+
+=item B<--left-index> IDX
+
+=item B<--right-index> IDX
+
+=item B<-1> IDX
+
+=item B<-2> IDX
+
+specify that the {left,right} merge field should be field number
+I<IDX> (one-based, like I<cut> uses).  Default is 1 for both files.
+B<-1> is an alias for B<--left-index>; B<-2> is an alias for
+B<--right-index>.
+
+=item B<--left-delete-costs> WORD=COST
+
+=item B<--right-delete-costs> WORD=COST
+
+Specify that it should cost I<COST> to delete I<WORD> from {left,
+right}. Repeatable.
+
+Note that the default assumption is that any deletion from either side
+costs 1, and a substitution costs 1.
+
+=item the files
+
+C<align> expects exactly two non-option arguments (I<left-file> and
+I<right-file>).  Either (but not both) of these can be C<->, which
+indicates that C<align> should read that side of the alignment from
+STDIN, allowing this program to participate in pipelining.
+
+=back
+
+=head2 other options
+
+=over
+
+=item B<--help>
+
+=item B<-?>
+
+Show this help message.
+
+=item B<--man>
+
+Show the manual page for this script.
+
+=item B<--directinput>
+
+By default, requests to get trees from a human-operated TTY on STDIN
+will get a usage message and an exit (this is so users can run
+C<mrg_to_side> and get the usage message).  If you really want to type
+trees by hand on STDIN, add the B<--directinput> flag.
+
+=item B<--verbose>
+
+Repeatable option. Report more of what we're doing.
+
+=back
+
+=head1 DESCRIPTION
+
+Takes two column-row oriented files as input. Aligns the files based
+on attempting to have the smallest-cost alignment between the index
+columns (which are usually the first columns in each.
+
+The smallest-cost alignment is (by default) the alignment with the
+smallest number of deletions, insertions, and substitutions.
+
+=head2 Modifying the costs
+
+The B<--left-delete-costs> and B<--right-delete-costs> options allow
+the user to identify some tokens that are (more) acceptable to delete,
+e.g.:
+
+  align --left-delete-cost '[silence]=0.1' \
+        --right-delete-cost '[silence]=0.1'
+
+indicates that aligning the C<[silence]> tokens with a skip should be
+not as good as aligning C<[silence]> with C<[silence]> (zero cost) but
+that aligning C<[silence]> tokens should be much less important than
+aligning other words (which continue to cost 1 to delete).
+
+=head2 The fields
+
+C<align> assumes that each file is consistent with respect to the
+number of rows.  It uses the first row to get an idea of how many
+columns there should be, and then issues a warning when it doesn't
+find that many.
+
+Currently, the fields are separated by any group of consecutive
+whitespace.  Missing fields are padded with C<--->, whether they're
+missing in the input or aligned against a deletion. Thus the output
+should have the same number of columns as the sum of the I<left-file>
+and I<right-file>.  But see L</TO DO>.
+
+=head2 CAVEATS
+
+=over
+
+=item *
+
+Not super fast, especially as the files get large.
+
+=item *
+
+Should maybe be zero-based indices on the commandline for general
+sanity and cooperation with modern CS thinking, but is currently
+one-based for (semi-)compatibility with I<cut> and I<join> mavens.
+
+=back
+
+=head2 TO DO
+
+=over
+
+=item support B<--case-insensitive> option
+
+should be easy to implement
+
+=item support B<--left-cols> and B<--right-cols> options
+
+Allow user to specify appropriate number of columns
+
+=item support B<--pad-symbol> option
+
+Currently only supports C<---> as the padding
+
+=item support B<--subst-cost> a,b=N option and B<--equivalent> a=b
+option
+
+Allow certain kinds of substitutions for free or cheap
+
+=item allow B<--separator|-d> option
+
+(currently just supports whitespace split), should allow any
+separator.
+
+=item allow B<--output-separator> option
+
+currently uses C<\t> (tab) only.
+
+=item allow B<--row-separator> option
+
+Could allow dynamic alignment of paragraphs.  This might be
+feature-creep, though, since this could easily be handled on the
+pipeline
+
+=back
+
+=head1 AUTHOR
+
+Jeremy G. Kahn E<lt>jgk@ssli.ee.washington.eduE<gt>
+
+=cut
