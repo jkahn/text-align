@@ -48,3 +48,6 @@ my $al = Text::Align::Levenshtein->new(left => 'foo',
 				       keepgrid => 1,
 				      );
 print $al->dump_grid(), "\n";
+
+print "\n\n";
+print $al->dump_grid('html'), "\n";
