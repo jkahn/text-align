@@ -35,3 +35,16 @@ warn "testing the as_strings method for levenshtein";
 my $al =
   Text::Align::Levenshtein->new(left => 'pikachu', right => 'achoo');
 ok($al->as_strings(separator => "\t"), "pikach-u\t---achoo");
+
+my $al = Text::Align::Levenshtein->new(left => 'foo',
+				       right => 'foe',
+				       keepgrid => 1,
+				      );
+print $al->dump_grid(), "\n";
+
+print "\n\n";
+my $al = Text::Align::Levenshtein->new(left => 'foo',
+				       right => 'foot',
+				       keepgrid => 1,
+				      );
+print $al->dump_grid(), "\n";

@@ -1,9 +1,8 @@
 ﻿package Text::Align;
-
 use 5.006;
 use strict;
 use warnings;
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 ##################################################################
 use Carp;
 use utf8; # character semantics, please
@@ -32,6 +31,8 @@ use constant RIGHT => 9;
 
 # ID key for subclasses (which should maintain their own data hashes)
 use constant ID => 10;
+
+use constant GRID => 11;
 
 # boolean trace helper (debugging aid; turn on for easier debugging)
 use constant TRACE_WEIGHTS => 0;
@@ -80,6 +81,10 @@ sub new {
     }
     elsif ( not defined $args{right} ) {
 	croak "no right key provided to new()";
+    }
+
+    if ( exists $args{keepgrid} ) {
+	$self->[GRID] = $args{keepgrid};
     }
 
     $self->[ID] = scalar @ids;
@@ -302,6 +307,18 @@ sub _align {
     $self->[ACTIONS][0][0] =
       [undef,undef];
 
+#      # JGK rewrite to crawl diagonals
+#      $self->[POS_X] = 0;
+#      $self->[POS_Y] = 0;
+#      until ($self->[POS_X] == @left and $self->[POS_Y] == @right) {
+#  	# cost the current value
+
+#  	# choose next value:
+#  	if ( $self->[POS_X] == 0 ) {
+#  	    $self->[POS_X]
+
+#      }
+
     # initialize edge cells
     $self->[POS_Y] = 0;
     for my $x (1 .. $#left) {
@@ -394,15 +411,57 @@ sub _align {
     @{$self->[PATH]} =
       $self->_backtrace($self->[POS_X], $self->[POS_Y]);
 
-    # discard dynamic actions record
-    delete $self->[LEFT];
-    delete $self->[RIGHT];
+    if (not $self->[GRID]) {
+	delete $self->[LEFT];
+	delete $self->[RIGHT];
+	delete $self->[ACTIONS];
+    }
 
-    delete $self->[ACTIONS];
+    # discard dynamic actions record
     delete $self->[POS_X];
     delete $self->[POS_Y];
     delete $self->[BT_X];
     delete $self->[BT_Y];
+
+    if ($self->[GRID]) {
+	$self->[GRID] = \@costs;
+    }
+}
+##################################################################
+sub dump_grid {
+    my $self = shift;
+    if (not ($self->[GRID] and $self->[ACTIONS])) {
+	croak "can't call dump_grid unless keepgrid option passed";
+    }
+    my @cells;
+    for my $column (0 .. $#{$self->[GRID]}) {
+	for my $row (0 .. $#{$self->[GRID][$column]}) {
+	    my ($l, $r) = @{$self->[ACTIONS][$column][$row]};
+	    my $text = $self->[GRID][$column][$row];
+	    my $action_sym = '*';
+	    if (defined $l and defined $r) {
+		$action_sym = '\\';
+	    }
+	    elsif (defined $l and not defined $r) {
+		$action_sym = '-'; # deletion
+	    }
+	    elsif (not defined $l and defined $r) {
+		$action_sym = '|'; # insertion
+	    }
+	    $cells[$row][$column] = $text . ' ' . $action_sym;
+	}
+    }
+
+    unshift @cells, ['#', '', map { "$_" } @{$self->[LEFT]}]; # add a header
+    unshift @{$cells[1]}, '';
+    for my $row (0 .. $#{$self->[RIGHT]}) {
+	my $header = "$self->[RIGHT][$row]";
+	unshift @{$cells[$row+2]}, $header;
+    }
+
+    my @lines = map { join "\t", @{$_} } @cells;
+    return join "\n", @lines;
+
 }
 ##################################################################
 sub dump_trace {
@@ -825,6 +884,13 @@ If the subclass does not provide an implementation of C<init()>, a
 null-operation implementation will be provided by (this) the base
 class.
 
+=item overload '""' on tokens
+
+If the items being compared are not strings but objects of some sort,
+I<and> you want to use the C<dump_grid> method, you'll have to provide
+a stringification overloading on the objects or the resulting grid
+will have nonsensical junk as boundary identifiers.
+
 =back
 
 =head2 Weighting utility methods
@@ -932,6 +998,16 @@ The two arguments (C<left> and C<right>) need not be the same datatype
 -- one may be a listref, and the other a string, and all is well: the
 string will be C<split>.
 
+=item keepgrid => value
+
+if C<keepgrid> is provided and true, then the resulting object will be
+able to call the C<dump_grid> method. This is probably most useful for
+debugging.
+
+If C<keepgrid> is not provided (or is false) then the data required
+for C<dump_grid> will be discarded, and the C<dump_grid> method will
+C<croak>.
+
 =back
 
 See L</Instance methods> below for methods available from the object
@@ -1022,6 +1098,22 @@ Returns 2 values representing the C<left> and C<right> lists of
 alignments, with C<undef> values inserted opposite any skipped
 tokens. Matching or substituted elements will be listed unchanged.
 
+=item dump_grid
+
+Returns a complex string, diagrammatizing the alignment, including
+costs and trackbacks, e.g.:
+
+  #               f       o       o
+          0 *     1 -     2 -     3 -
+  f       1 |     0 \     1 -     2 -
+  o       2 |     1 |     0 \     1 \
+  e       3 |     2 |     1 |     1 \
+
+Note that the separators will be tabs, and the lemmas along the edges
+will be the stringified version of the objects passed. Characters will
+work just fine (but if you're using objects, be sure to provide the
+string overloading!).
+
 =back
 
 =head2 EXPORT
@@ -1042,8 +1134,8 @@ Install the prerequisites (see L</Prerequisites>).
 C<gunzip> and un-C<tar> the distribution into a working directory. On
 Unix, this looks like:
 
-  tar zxvf Text-Align-NNN.tar.gz # NNN corresponds to the version
-                                 # number
+  tar zxvf Text-Align-NNN.tar.gz # NNN corresponds to the
+                                 # version number
 
 On Windows, you may have to use Cygwin tools
 (L<http://www.redhat.com>) or Winzip, using "Extract with
@@ -1168,6 +1260,10 @@ C<reset_class()> clears the id tables
 =item 0.08
 
 Separated out C<Text::Align::Covington> and C<Text::Align::Phone>.
+
+=item 0.09
+
+added dump_grid method
 
 =back
 
