@@ -171,11 +171,11 @@ __END__
 
 =head1 NAME
 
-  align -- does dynamic programming alignment of 2 col-based files
+  column-align -- does dynamic programming alignment of 2 col-based files
 
 =head1 SYNOPSIS
 
-  align [options] [left-file right-file]
+  column-align [options] [left-file right-file]
 
   Options:
     --left-index I (use field I as index field)
