@@ -430,6 +430,12 @@ sub _align {
 ##################################################################
 sub dump_grid {
     my $self = shift;
+    my $mode = shift;
+
+    if (not defined $mode) {
+	$mode = 'text';
+    }
+
     if (not ($self->[GRID] and $self->[ACTIONS])) {
 	croak "can't call dump_grid unless keepgrid option passed";
     }
@@ -437,7 +443,7 @@ sub dump_grid {
     for my $column (0 .. $#{$self->[GRID]}) {
 	for my $row (0 .. $#{$self->[GRID][$column]}) {
 	    my ($l, $r) = @{$self->[ACTIONS][$column][$row]};
-	    my $text = $self->[GRID][$column][$row];
+	    my $text = sprintf "%.3f", $self->[GRID][$column][$row];
 	    my $action_sym = '*';
 	    if (defined $l and defined $r) {
 		$action_sym = '\\';
@@ -459,8 +465,55 @@ sub dump_grid {
 	unshift @{$cells[$row+2]}, $header;
     }
 
-    my @lines = map { join "\t", @{$_} } @cells;
-    return join "\n", @lines;
+
+    if ($mode eq 'text') {
+	my @lines = map { join "\t", @{$_} } @cells;
+	return join "\n", @lines;
+    }
+    elsif ($mode eq 'html') {
+
+	my $HEAD_REPEAT = 10;
+	use Text::Wrap;
+
+	my @rows; # output text
+
+	# insert header row every $HEAD_REPEAT rows
+	my $head_row = shift @cells;
+	$head_row = [ map { "<b>$_</b>" } @{$head_row} ];
+	my @out_cells =
+	  map { $_ % $HEAD_REPEAT == 0 ?
+		  ($head_row, $cells[$_]) :
+		    $cells[$_] } (0 .. $#cells);
+
+	# insert header cell every $HEAD_REPEAT columns, and push the
+	# resulting text onto @rows
+	for my $row (@out_cells) {
+	    my $header = $row->[0];
+	    $header = "<b>$header</b>\n" if not $header =~ /^<b>/;
+	    $row->[0] = $header;
+
+	    my @row_cells = @{$row};
+#  	    $header = "<b>$header</b>";
+	    @row_cells =
+	      map { ($_ and $_ % $HEAD_REPEAT== 0) ?
+		      ($header, $row_cells[$_]) :
+			$row_cells[$_]
+		    } (0 .. $#row_cells);
+
+	    my $rowtext = wrap(" " x 4, " " x 4,
+			       map { "<td>$_</td>" } @row_cells);
+	    push @rows,
+	      " " x 2 . "<tr>\n" .
+	      $rowtext . "\n" .
+		" " x 2 . "</tr>";
+	}
+
+
+	unshift @rows, '<table border>';
+	push @rows, '</table>';
+
+	return join "\n", @rows;
+    }
 
 }
 ##################################################################
@@ -595,7 +648,8 @@ sub backstep {
 sub _min {
     carp "not 3 args passed to _min!" if ( @_ != 3 );
     my ($answer) = shift;
-    while (my $next = shift @_) {
+    my $next;
+    while (defined ($next = shift @_)) {
 	if ($next < $answer) {
 	    $answer = $next;
 	}
@@ -1113,6 +1167,36 @@ Note that the separators will be tabs, and the lemmas along the edges
 will be the stringified version of the objects passed. Characters will
 work just fine (but if you're using objects, be sure to provide the
 string overloading!).
+
+If C<dump_grid> is passed an argument C<html>, it emits the same table
+in an HTML table:
+
+  <table border>
+    <tr>
+      <td><b>#</b></td> <td><b></b></td> <td><b>f</b></td> <td><b>o</b></td>
+      <td><b>o</b></td>
+    </tr>
+    <tr>
+      <td><b></b>
+      </td> <td>0 *</td> <td>1 -</td> <td>2 -</td> <td>3 -</td>
+    </tr>
+    <tr>
+      <td><b>f</b>
+      </td> <td>1 |</td> <td>0 \</td> <td>1 -</td> <td>2 -</td>
+    </tr>
+    <tr>
+      <td><b>o</b>
+      </td> <td>2 |</td> <td>1 |</td> <td>0 \</td> <td>1 \</td>
+    </tr>
+    <tr>
+      <td><b>o</b>
+      </td> <td>3 |</td> <td>2 |</td> <td>1 \</td> <td>0 \</td>
+    </tr>
+    <tr>
+      <td><b>t</b>
+      </td> <td>4 |</td> <td>3 |</td> <td>2 |</td> <td>1 |</td>
+    </tr>
+  </table>
 
 =back
 
