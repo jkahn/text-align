@@ -5,6 +5,8 @@ MANIFEST.SKIP
 README
 test.pl
 
+scripts/align
+
 Align/background.pod
 Align/analysis.pod
 Align/future.pod
