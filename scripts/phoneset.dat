@@ -1,0 +1,89 @@
+﻿# ﻿
+# Covington's implied phoneset
+
+# implicatures
+( [+cons] => [ *high *low *front *back *long ] )
+( [+cons -vow] => *round)
+( [+vow] => [ *glottal *velar *palatal *alveolar *dental *interdental *labial ] )
+( [+vow] => [ *stop *fricative *liquid *nasal ] )
+( [+vow -cons] => [ +voice *liquid *nasal ] )
+
+# vowel implicatures
+( +high => -low )
+( +low  => -high )
+( +front => -back )
+( +back => -front )
+
+
+# consonant implicatures - place
+( +glottal     => [          -velar -palatal -alveolar -dental -interdental -labial ] )
+( +velar       => [ -glottal        -palatal -alveolar -dental -interdental -labial ] )
+( +palatal     => [ -glottal -velar          -alveolar -dental -interdental -labial ] )
+( +alveolar    => [ -glottal -velar -palatal           -dental -interdental -labial ] )
+( +dental      => [ -glottal -velar -palatal -alveolar         -interdental -labial ] )
+( +interdental => [ -glottal -velar -palatal -alveolar -dental              -labial ] )
+( +labial      => [ -glottal -velar -palatal -alveolar -dental -interdental         ] )
+
+# consonant implicatures - manner
+( +stop      => [-liquid -nasal] )
+( +fricative => [-liquid -nasal] )
+( +nasal     => [+voice -stop -liquid -fricative -liquid] )
+( +liquid    => [+voice -stop -fricative -nasal])
+
+æ [ +vow -cons +front             +low -round -long ]
+a [ +vow -cons -front -back       +low -round -long ]
+ā [ +vow -cons -front -back       +low -round +long ]
+ə [ +vow -cons -front -back -high -low -round -long ]
+e [ +vow -cons +front       -high -low -round -long ]
+ē [ +vow -cons +front       -high -low -round +long ]
+ɛ [ +vow -cons +front       -high -low -round -long ]
+i [ +vow -cons +front       +high      -round -long ]
+ī [ +vow -cons +front       +high      -round +long ]
+o [ +vow -cons        +back -high -low +round -long ]
+ō [ +vow -cons        +back -high -low +round +long ]
+ö [ +vow -cons +front       -high -low +round -long ]
+u [ +vow -cons        +back +high      +round -long ]
+ū [ +vow -cons        +back +high      +round +long ]
+ü [ +vow -cons +front       +high      +round -long ]
+
+m [ -vow +cons +labial   +nasal ]
+n [ -vow +cons +alveolar +nasal ]
+ŋ [ -vow +cons +velar +nasal ]
+
+l [ -vow +cons +alveolar +liquid ]
+r [ -vow +cons +alveolar +liquid ]
+
+
+w [ +vow +cons +round +voice ]
+y [ +vow +cons -round +voice ]
+
+p [ -vow +cons +labial +stop -fricative -voice]
+b [ -vow +cons +labial +stop -fricative +voice]
+f [ -vow +cons +labial -stop +fricative -voice]
+v [ -vow +cons +labial -stop +fricative +voice]
+
+θ [ -vow +cons +interdental -stop +fricative -voice]
+ð [ -vow +cons +interdental -stop +fricative +voice]
+
+t [ -vow +cons +alveolar +stop -fricative -voice]
+d [ -vow +cons +alveolar +stop -fricative +voice]
+s [ -vow +cons +alveolar -stop +fricative -voice]
+z [ -vow +cons +alveolar -stop +fricative +voice]
+
+š [ -vow +cons +palatal -stop +fricative -voice]
+ž [ -vow +cons +palatal -stop +fricative +voice ]
+#  ǰ [ -vow +cons +palatal +stop +fricative +voice ]
+# until we've worked out how to include modifier characters
+j [ -vow +cons +palatal +stop +fricative +voice ]
+
+k [ -vow +cons +velar +stop -fricative -voice ]
+g [ -vow +cons +velar +stop -fricative +voice ]
+x [ -vow +cons +velar -stop +fricative -voice ]
+
+h [ -vow +cons +glottal -stop +fricative -voice ]
+q [ -vow +cons +glottal +stop -fricative -voice ]
+
+
+class CONS => [ +cons ]
+class GLIDE => [ +vow +cons ]
+class VOW => [ +vow -cons ]

@@ -1,0 +1,44 @@
+Text/Align version 0.01
+=======================
+
+This module is intended to be a base class for modules that intend to
+experiment with the Ukkonen/Kruskal dynamic-programming algorithm for
+alignment.
+
+Derived classes shipped with this component include
+Text::Align::Levenshtein and Text::Align::WagnerFischer, which are
+intended as more configurable replacements for Text::Levenshtein and
+Text::WagnerFischer. (The latter pair of modules do not allow the user
+to examine the alignment resulting in the score).
+
+This module allows the user to use alternate weightings, based on the
+specific characters (or elements) being substituted, deleted or
+inserted.
+
+It also can apply to calculate alignments between arrays, if array
+references are provided.
+
+INSTALLATION
+
+To install this module type the following:
+
+   perl Makefile.PL
+   make
+   make test
+   make install
+
+DEPENDENCIES
+
+This module requires these other modules and libraries:
+
+  Just pure Perl (so far).
+
+COPYRIGHT AND LICENSE
+
+Copyright (C) 2002 Jeremy Kahn <kahn@cpan.org>
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself. It was written for academic
+purposes; if you find yourself using it, please credit the author
+appropriately (he reads email, too).
+

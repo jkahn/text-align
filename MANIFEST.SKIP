@@ -1,0 +1,7 @@
+^blib/
+\.exists$
+\bpm_to_blib$
+~$
+\bMakefile$
+\bMakefile.old$
+.tar.gz$

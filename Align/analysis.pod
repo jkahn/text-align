@@ -1,0 +1,321 @@
+# Jeremy Kahn
+
+=head1 Analysis of the alignments
+
+This is an analysis of four (or five, depending on how you count)
+alignment algorithms derived from C<Text::Align>.
+
+=head2 Corpus
+
+This analysis uses the 82 cognate words listed in Covington
+(L<1996|Text::Align/Citations>) as the raw test data.  The data are
+available in the distribution directory of C<Text::Align::Covington>.
+
+The Covington cognates were re-entered as UTF-8 encoded symbols,
+using, where possible, the same symbols that Covington used. This
+symbol set is not IPA, though it wouldn't be hard to modify it to be
+IPA.
+
+The corpus as used in this experiment can be found in the
+C<Text::Align> distribution, in the C<scripts> subdirectory, as
+C<scripts/Covington_cognates.txt>.  It is best viewed using a UTF-8
+capable text-editor, with a Unicode-capable font. (Microsoft Internet
+Explorer and Mozilla, will do this without a hitch.)
+
+=head2 Evaluation
+
+A script C<align_cognates.pl> was designed to test all of the
+alignments described below.  This script was run on the corpus (after
+installing the C<Text::Align> modules):
+
+  cd scripts
+  perl align_cognates.pl Covington_cognates.txt
+
+Alignment files are created in a newborn C<alignments> directory.
+
+Evaluation of the alignments was performed by eye inspection of the
+results, dividing them into three categories: clearly correct, clearly
+wrong, and borderline.
+
+=over
+
+=item Levenshtein
+
+"Levenshtein" alignments -- the simplest ones, where insertions,
+deletions, and substitutions each cost 1 -- seem to do a fairly good
+job at alignments, even with little or no linguistic sensitivity.  See
+L<Text::Align::Levenshtein> for usage instructions for this module.
+
+The Levenshtein alignment seemed to perform best when the words under
+comparison are short (examples are from English/German):
+
+  # long:lang	'long'
+  l  o  ŋ
+  l  a  ŋ
+
+  # man:Mann	'man'
+  m  æ  n
+  m  a  n
+
+  # blood:Blut	'blood'
+  b  l  ə  d
+  b  l  ū  t
+
+(Of course, the search space of possible alignments in short words is
+much smaller, so it's not such a surprise that these should perform
+better).
+
+However, it seems to break down quickly when any of the following
+hold:
+
+=over
+
+=item *
+
+One of the words has an extra (possibly frozen) segment, like an extra
+morpheme:
+
+  # this:dieses 'this'
+  -  -  ð  i  s
+  d  ī  z  ə  s
+
+  # fish:piscis	'fish'
+  -  -  -  f  i  š
+  p  i  s  k  i  s
+
+  # name:nōmen	'name'
+  n  -  e  y  m
+  n  ō  m  e  n
+
+  # sit:sēdere	'sit'
+  s  -  -  -  i  t
+  s  ē  d  e  r  e
+
+=item *
+
+The two words have changes where more than one class of phone has
+changed, and the length of the word has also changed.
+
+  # not:nicht	'not'
+  n  -  a  t
+  n  i  x  t
+
+  # eye:Auge	'eye'
+  a  -  -  y
+  a  w  g  ə
+
+As an aside, where the length hasn't changed, things often work out
+okay, e.g.:
+
+  # foot:Fuß	'foot'
+  f  u  t
+  f  ū  s
+
+But that's mostly luck, because there's some serious problems:
+
+  # knee:Knie	'knee'
+  n  i  y
+  k  n  ī
+
+=back
+
+In general, the Levenshtein alignment is not worth much for
+determining cognate relationships -- in the 82 alignments generated
+here, 35 are 100% correct. Two more were very close:
+
+  # mountain:mōns	'mountain'
+  m  a  w  n  t  ə  n
+  m  -  ō  n  -  -  s
+
+  # flesch:Fleisch	'flesh'
+  f  l  -  e  š
+  f  l  a  y  š
+
+So, assuming that there are a few entries that are difficult to decide
+correctly, this gets an accuracy of 42-45%.
+
+=item Wagner-Fischer
+
+"Wagner-Fischer" alignments do somewhat better, if only because we can
+make it somewhat more expensive to do alignments.
+C<WagnerFischer1.txt> shows the alignments when the cost of a
+substitution is almost (but not quite) as expensive as the cost of an
+insertion and a deletion. See L<Text::Align::WagnerFischer> for
+further details on the use of this module.
+
+This algorithm (when a substitution costs 1.99, while deletions and
+insertions cost 1) gets 38 clearly correct, plus 7 more clearly close:
+
+  # knee:genū	'knee'
+  -  -  n  i  y
+  g  e  n  -  ū
+
+  # kiinwaawa:kenuaq	'you (pl.)'
+  k  ī  n  w  ā  w  a  -
+  k  e  n  -  -  u  a  q
+
+(... four more, three of which are below).
+
+This is only marginally better than the simple Levenshtein symbol
+matching (46-55%, depending on inclusion of "close" entries).
+
+When the cost of a substitution is made exactly the same as the cost
+of an insertion plus a deletion (2 for either case), as is performed
+in the Wagner-Fischer 2 case, it actually makes things I<worse>.
+
+=over
+
+=item Wagner-Fischer 1 (substitution cost 1.99):
+
+  # tongue:Zunge	'tongue'
+  t  -  ə  ŋ  -
+  t  s  u  ŋ  ə
+
+  # blow:flāre 	'blow'
+  b  l  o  w  -
+  f  l  ā  r  e
+
+  # šiišiipa:seeqsep	'duck (n.)'
+  š  ī  š  -  ī  p  a
+  s  ē  q  s  e  p  -
+
+=item Wagner-Fischer 2 (substitution cost 2):
+
+  # tongue:Zunge	'tongue'
+  t  -  -  -  ə  ŋ
+  t  s  u  ŋ  ə  -
+
+  # blow:flāre 	'blow'
+  b  l  -  o  w
+  f  l  ā  r  e
+
+  # šiišiipa:seeqsep	'duck (n.)'
+  -  š  ī  š  ī  p  a
+  s  ē  q  s  e  p  -
+
+=back
+
+So Wagner-Fischer 1 is an improvement over Levenshtein, but
+Wagner-Fischer 2 is really no better.
+
+=item Covington_a
+
+Covington's paper suggests a simple first metric that depends strictly
+on the equality of symbols, falling back to a vowel/consonant
+distinction. (See L<Text::Align::Covington/Covington_a> for details).
+
+This system uses a vowel/consonant distinction as defined in the
+C<phoneset.dat> file, found in the C<Text::Align> distribution as
+C<scripts/phoneset.dat>.
+
+This simple distinction gains an I<enormous> number of correct
+alignments. By my count, there were 20 clearly wrong alignments and 10
+close alignments, leaving 51 100% correct alignments (62 - 78%,
+depending on whether the close ones are counted). Impressively, it
+gets some right that seem subjectively difficult (to me, anyway):
+
+  # Greek tʰugatēr:German Tochter	'daughter'
+  t  h  u  g  a  t  ē  r
+  t  -  o  x  -  t  ə  r
+
+Though it still blows up on some that seem just a shade harder:
+
+  # English daughter:Greek tʰugatēr	'daughter'
+  -  -  -  d  o  t  ə  r
+  t  h  u  g  a  t  ē  r
+
+Almost all of the errors had to do with words that had an extra
+(sometimes bound) morpheme in one language than in another;
+English/Latin pairs in particular were problematic, because of Latin's
+gender-, case- and inflection-marking endings:
+
+  # ear:auris	'ear'
+  -  -  -  i  r
+  a  w  r  i  s
+
+  # eat:edere	'eat'
+  i  y  -  t  -
+  e  d  e  r  e
+
+  # fish:piscis	'fish'
+  -  -  -  f  i  š
+  p  i  s  k  i  s
+
+  # flow:fluere	'flow'
+  f  l  -  o  w  -
+  f  l  u  e  r  e
+
+This wasn't the only problem, though. For example, the C<Covington_a>
+algorithm does not understand the possible relationship between C<u>
+and C<w>, so this sort of example had problems:
+
+  # kiinwaawa:kenuaq	'you (pl.)'
+  k  ī  n  w  ā  w  a  -
+  k  e  n  -  u  -  a  q
+
+The algorithm evidently decided that C<u> was more like C<ā> than like
+C<w> (they both have the vowel nature).
+
+=item Covington
+
+The more-sophisticated weighting scheme Covington suggests (see
+L<Text::Align::Covington/Weighting Scheme>) does better still, even
+without the gap costing, which is as yet unimplemented.  This
+algorithm is sensitive to glides' relationship to their "canonical"
+vowels (C<i> and C<y>, C<u> and C<w>).
+
+This component also uses the phone-set described in
+C<scripts/phoneset.dat>.
+
+This algorithm gets 59 of the 82 pairs 100% correct, with 9 close,
+leaving 14 wrong for a 72-82% accuracy -- clearly a step up from the
+earlier implementations.
+
+For example, the following are correctly aligned with this algorithm
+but in no other presented:
+
+  # round:rotundus	'round'
+  r  a  -  w  n  d  -  -
+  r  o  t  u  n  d  u  s
+
+  # kiinwaawa:kenuaq	'you (pl.)'
+  k  ī  n  w  ā  w  a
+  k  e  n  u  a  q  -
+
+The errors that appeared were some of the usual suspects (English
+C<daughter I<dotər>:>Greek C<tʰugatēr>), for example).
+
+=back
+
+=head2 Remaining rough spots
+
+Most of the errors seen here seem like they're due to an inability to
+distinguish between phones of the same class -- for example, knowing
+that a C<t>-to-C<d> alignment was more plausible than a C<t>-to-C<r>
+alignment would undoubtedly have helped this attempt:
+
+  # eat:edere	'eat'
+  i  y  -  t  -
+  e  d  e  r  e
+
+In a few cases, the combination of sound change with the presence of
+an unmatched affix threw all of the systems into confusion:
+
+  # fish:piscis	'fish'
+  -  -  -  f  i  š
+  p  i  s  k  i  s
+
+  # tooth:dentis	'tooth'
+  -  -  -  t  u  w  θ
+  d  e  n  t  i  -  s
+
+
+=head2 Further work
+
+The rather preliminary results outlined here suggest a number of
+improvements that could be added to an alignment scheme.
+
+Please see L<Text::Align::future> for some possible directions to
+expand, extend, and build on this module.
+
+=cut

@@ -1,0 +1,437 @@
+﻿
+# Jeremy Kahn
+# Computational Linguistics, Fall 2002
+# University of Washington
+
+
+=head1 Desiderata
+
+What criteria would be ideal for a general purpose string-alignment
+and string-distance computation component?
+
+This document sets out to motivate the construction of such a
+component, and to discuss its architecture and relationship to prior
+work in the Perl community.
+
+=head2 Distance/similarity measurements
+
+For a number of fields of research, it is useful to be able to have a
+quantitative measure of the degree of similarity of two sequences. For
+example:
+
+=over
+
+=item computational biology
+
+In computational approaches to molecular biology, it is valuable to
+begin by measuring how similar the two I<sequences> of I<codons>
+are. For example, in determining how closely two genes (or organisms)
+relate, it is nice to know to what degree does the genetic material of
+organism (or gene) C<A> resemble the genetic material of gene (or
+organism) C<B>.
+
+Not only do the nucleic acids (RNA and DNA) contain interesting
+sequence information. So too do the protein sequences they encode, and
+at a somewhat higher level, so the computation study of protein
+construction and folding also finds it valuable to explore proteins by
+computationally discovering the degree of sequence similarity.
+
+=item "intelligent" matching
+
+In common programming applications that deal with realworld data,
+e.g. word processing, users frequently enter words not in the system
+onboard lexicon. Usually, this is a typing mistake, and it's valuable
+in those cases to find the words resembling the (probably mistyped)
+current word.
+
+  User typed:       Near matches:
+  conversatin       conversation
+  treee             tree, treed
+  qukz              quiz
+
+This "nearest-mismatch" approach applies equally well at the
+phone-symbol level, in terms of fuzzy-matching a user utterance to a
+known set of, e.g., names:
+
+  User said:        Near matches:
+  smIt	            smIθ, smIts ("smith", "smitts")
+  ʤanz	            ʤonz, ʤan, ʤænz ("jones", "john", "jans/jan's")
+
+One attempt to quickly identify names by the similarity of their sound
+was C<Soundex> (see L<Text::Soundex>), which collapses any name into
+five or fewer mostly-numeric characters. In some sense, this is an
+attempt to make a coarsely-scaled decision about similarity.  However,
+it's difficult to move from C<Soundex> to a considered model of
+similarity -- either the two names map to the same symbol, or they
+don't.
+
+The more recent Editex and Ipadist measures (Zobel and Dart 1996)
+demonstrate some more flexible distance measures for identifying
+near-match orthographic words based in part on their phonetic form.
+
+=item historical linguistics
+
+In historical linguistics, the Comparative Method often begins by
+assembling cognate words from related languages. One way to detect
+cognates might be to examine phonetic similarity (though other
+methods, including semantic similarity, might be interesting; see
+L<Kondrak (2001)|/Citations>).
+
+For this reason, a key component of cognate selection is a
+quantitative way to measure phonetic distance between two words. It
+may be useful to have a "handedness" in this kind of distance measure,
+e.g.:
+
+   English     Latin
+   f        => p   # close (e.g. faðər => pater)
+   p        => f   # far
+
+since some languages may undergo systematic sound changes
+(e.g. Grimm's Law) while their siblings did not.
+
+=back
+
+The I<minimum edit distance>, described by L<Levenshtein
+(1966)|/Citations>, is a way of describing the similarity of two
+strings (or sequences). Levenshtein defined it as the minimum number
+of single-character changes (insertions, deletions, and substitutions)
+made on one string to transform it into the other.
+
+But this description of distance leaves out many interesting aspects
+of string "distance" -- for example, that some symbols may be more
+likely to be confused (or exchanged, or deleted, or inserted) than
+others. In the phonetics domain, it seems more reasonable to allow
+C<b> to be a substitution for C<p> than to allow C<ŋ> to be a
+substitution for C<p>:
+
+  Language A     Language B
+  apa            aba        # plausible, or "close"
+  apa            aŋa        # implausible, or "distant"
+
+Similarly, simple typing errors should be considered "closer" by a
+typing-distance sensitive measure (that might, for example, be used as
+a tool for helping detect typographical errors in a word processor):
+
+  Typist         Intention
+  appke          apple      # plausible -- k is near l on QWERTY keyboards
+  appbe          apple      # implausible -- b is far from l
+
+A tool that was able to construct a quantitative distance measure that
+acknowledged these sorts of intuitions about distance would be a
+useful component in many applications.
+
+=head2 Alignment
+
+Of course, the determination of such a "distance" implies, in nearly
+every case above, an alignment between the segments of one word and
+the segments of the other.  Alignments can be seen in several
+essentially equivalent ways:
+
+=over
+
+=item alignment
+
+An identification of which elements in one string corresponds to which
+elements (if any) in the other.
+
+=item trace
+
+A series of instructions to advance pointers on one string or the
+other (e.g., L<Covington (1996)|/Citations>).
+
+=item edits
+
+A collection of I<insertions>, I<deletions>, and I<substitutions>
+(e.g., L<Wagner and Fischer (1974)|/Citations>).
+
+=back
+
+In either case, any alignment or weight-discovery tool should be able
+to report its chosen alignment in any of these forms.
+
+In some applications, the alignment of segments at the "closest"
+distance measure is actually more useful than the distance measure
+itself. For example, in historical linguistics and certain kinds of
+computational biology, aligning segments or regions with each other is
+a critical first step in a reconstruction of an ancestor (for example,
+in Kondrak (L<2002|/Citations>)).
+
+=head2 Dynamic programming
+
+L<Jurafsky and Martin|/Citations> describe a dynamic programming
+algorithm for calculating the minimum edit distance.  This algorithm
+(which is essentially the algorithm described in L<Wagner and Fischer
+(1974)|/Citations> and L<Levenshtein (1966)|/Citations>) and its
+descendants use a distance calculation that depends on one critical
+decision, made C<n*m> times: the comparison of two symbols.
+
+This polynomially-bound algorithm is especially important for
+applications to computational biology (where the sequences to be
+aligned are quite long) and to corpus-driven linguistics, where though
+the sequences may be quite short, the number of sequences to compare
+may be quite large.
+
+=head2 Flexibility
+
+In early versions of this algorithm, distance depends on an exact
+match between two segments.  Non-matching pairs are all ranked alike.
+But this need not be the case, since the decision about individual
+weights can be handed off to a specialist module, which may decide
+that certain mismatches are closer than others.
+
+For different applications, different measurements of similarity are
+appropriate. Therefore, it would be preferable to have a framework
+where the distance measure could be provided as a parameterized
+"customization" of the core alignment algorithm, keeping the core
+dynamic programming algorithm abstract, factored out from the
+logic of determining a weight.
+
+See L</Architecture> for more on this subject.
+
+=head1 Related Perl modules
+
+Some freely available software components that work with string
+distances and alignment can be found on the Comprehensive Perl Archive
+Network (see L<http://www.cpan.org>). Exploring how this module
+(C<Text::Align>) relates to those is useful.
+
+=over
+
+=item L<Text::Levenshtein>
+
+=item L<Text::WagnerFischer>
+
+These modules provide functions that return simple edit distance
+computations. They do not provide the alignment (or edit sequence, or
+trace) corresponding to the minimum edit distance.
+
+See L<Text::Align::Levenshtein> and L<Text::Align::WagnerFischer> for
+replacements for those two modules that are derived from this
+(C<Text::Align>) module.
+
+=item L<Algorithm::Diff>
+
+Provides functions on two arrays that represent the insertion and
+deletion sequence between them.  It implicitly uses an alignment
+algorithm that must represent a minimum edit distance, but has no
+interface that allows a report of how similar the two strings are.
+
+However, it seems fairly clear that the algorithm used:
+
+=over
+
+=item *
+
+treats insertions and deletions as equivalent, and substitutions are
+not reported (rather, reported as an insertion and a deletion).
+
+=item *
+
+uses a simple weighting: it tests simple equality of the keys.
+
+=back
+
+This module (C<Text::Align>) can provide an extension to
+C<Algorithm::Diff>'s behavior, but with I<any> weighting scheme.
+
+=over
+
+=item 1
+
+it provides a drop-in replacement for the C<Algorithm::Diff> callback
+hooks.  I<This is not yet implemented.>
+
+=item 2
+
+it can provide alternate (non-boolean) weightings.
+
+=item 3
+
+it can provide a single distance measure, in addition to the number of
+differences discovered.
+
+=item 4
+
+Because of the non-boolean weighting, this module can discover
+substitutions that are "better" (lower cost) than a corresponding
+substitution and insertion, and report them as such.
+
+=back
+
+Note that C<Algorithm::Diff> may well be faster than this module, but
+this module intends to be more flexible.
+
+B<NOTE: the C<Algorithm::Diff> emulation is not implemented.> See
+L<Text::Align::future/Minor "nice-to-have" patches>.
+
+=back
+
+=head1 Architecture
+
+The design of C<Text::Align> is intended to meet some or all of the
+criteria set out in the sections above (L</Desiderata>).
+
+It is an object-oriented system, with a heavy emphasis on inheritance.
+
+=head2 Base class
+
+The primary base class is C<Text::Align>.  Its role is to abstract out
+the basic dynamic programming technique mentioned in L<Jurafsky and
+Martin|/Citations>.
+
+It is a contract class; that is, it provides functionality to its
+subclasses, but it in turn expects the subclass to meet a certain
+I<interface>. See L<Text::Align/Contract methods>.
+
+There are two primary services that C<Text::Align> provides to its
+subclasses, abstracting out this layer of processing:
+
+=over
+
+=item Dynamic-programming alignment
+
+Upon construction of a C<Text::Align> object, the alignment is
+performed immediately by the base class, calling contract methods of
+the subclass to do so.
+
+=item representation
+
+C<Text::Align> objects of the base class stores the optimal alignment
+(as calculated upon construction) and performs the appropriate
+transformations to emit the aligned units in any of several data
+structures (as, for example, a I<trace>, or as an I<alignment> -- see
+L<Text::Align/Instance methods>).
+
+=back
+
+=head2 Derived classes
+
+Derived classes are responsible for handling the "specialist" work --
+the ranking of similarity (actually, difference) between two candidate
+segments.  Trivial derived classes (like C<Text::Levenshtein>) simply
+return 1 whenever the segments under consideration are different, and
+0 when they are identical.
+
+More sophisticated subclasses, like C<Text::Covington>, rank the
+similarity of two segments based on more complex factors, e.g.:
+
+=over
+
+=item *
+
+Is the segment a vowel?
+
+=item *
+
+If the segment is a vowel, is it long?
+
+=item *
+
+Is the segment a glide?
+
+=back
+
+=head2 Installation
+
+You can find installation instructions in the C<README> file
+distributed with this code, or see L<Text::Align/Installation>.
+
+=head2 The documentation (how to read)
+
+Each module shipped with this distribution has its own builtin
+documentation. See L<Text::Align> for a good starting point.
+
+  perldoc Text::Align # a good start.
+
+=head1 Further direction
+
+This module suggests a number of directions for further work. See
+L<Text::Align::future>.
+
+=head1 Citations
+
+=over
+
+=item Covington, Michael A. (1996)
+
+"An Algorithm to Align Words for Historical Comparison",
+I<Computational Linguistics>, 22(4), pp. 481-496.
+
+=item Jurafsky, D. and Martin, J. (2000)
+
+I<Speech and Language Processing>. Prentice-Hall.
+
+=item Kondrak, Grzegorz (1999)
+
+I<Alignment of Phonetic Sequences>, Technical
+Report CSRG402, University of Toronto
+(L<ftp://ftp.cs.toronto.edu/csri-technical-reports/402/>).
+
+=item Kondrak, Grzegorz (2000)
+
+"A New Algorithm for the Alignment of Phonetic Sequences",
+I<Proceedings of the First Meeting of the North American Chapter of
+the Association for Computational Linguistics>, pp. 288-295.
+
+=item Kondrak, Grzegorz (2001)
+
+"Identifying Cognates by Phonetic and Semantic Similarity". I<Proceedings
+of the Second Meeting of the North American Chapter of the Association
+for Computational Linguistics (NAACL-2001)>, pp. 103-110, Pittsburgh,
+June, 2001.
+
+=item Kondrak, Grzegorz (2002)
+
+I<Algorithms for Language Reconstruction>. Ph.D Thesis, University of
+Toronto, July 2002. Available from
+L<http://www.cs.ualberta.ca/~kondrak/thesis.pdf>
+
+=item Levenshtein, V.I. (1966)
+
+"Binary codes capable of correcting deletions, insertions, and
+reversals." I<Soviet Physics Doklady>, 10(8), pp. 708-710.  As cited
+in various other papers.
+
+TO DO: find a copy of this.
+
+=item Philips, L. (2000)
+
+"The Double-Metaphone Search Algorithm", I<C/C++ User's Journal>, 18(6).
+
+=item Ukkonen (1985)
+
+"Finding approximate patterns in strings", I<Journal of Algorithms>,
+(1985), Vol. 6, pp. 132-137.
+
+TO DO: find a copy of this.  The name is frequently mentioned.
+
+=item Wagner and Fischer (1974)
+
+"The String-to-String Correction Problem". I<Journal of the
+Association for Computing Machinery> (1974), 21(1) 168-173.  As cited
+elsewhere
+
+TO DO: find a copy of this.  I'm sure the behavior is the same as the
+Perl module; now to be sure.
+
+=item Zobel and Dart (1995)
+
+Phonetic String Matching: Lessons from Information Retrieval
+(1996). I<Proceedings of the 19th International Conference on Research
+and Development in Information Retrieval>
+
+=back
+
+=head1 SEE ALSO
+
+=over
+
+=item L<Text::Align>.
+
+=item L<Text::Align::future>.
+
+=item L<Text::Align::analysis>.
+
+=back
+
+=cut

@@ -1,0 +1,221 @@
+=head1 Directions for further work
+
+Here is a list of possible future directions in which to extend this
+project.
+
+They are in no particular order within each section, and not all may
+even be possible with the current architecture.
+
+=head2 Major additions
+
+These are all extensions of the module to cover theoretical grounds it
+has not yet reached.
+
+Some may require extensive architectural rework, but several (e.g. the
+learning components) will use this module as currently structured as a
+framework upon which to build.
+
+=over
+
+=item gap costing
+
+Context sensitivity does not seem to work properly in this
+component. It seems to need to track multiple possible costs per C<(x,y)>
+cell simultaneously in order to support gap costing. To do this would
+probably require revisions to the core abstraction, not necessarily
+changes to the subclasses.
+
+=item context conditioning
+
+Existing hooks in the engine allow the user to peek back along the
+best-path-to-this-cell in the alignment. But until I<gap costing>
+works, this ability to peek does not always work correctly. (It
+remains to be seen whether a 2-pair peek would require something
+beyond what I<gap costing> provides).
+
+=item allow partial alignment
+
+Major problems for phonetic alignment appear because of the insertion
+or deletion of whole morphemes. As such, it would be nice to give a
+high ranking (relatively low cost) to alignments like this one:
+
+  # Sp. nosotros : Fr. nous   'we'
+  n o s o t r o s
+  n u - #
+
+which is the historical alignment, and a lower ranking (higher cost)
+to the following alignment:
+
+  n o s o t r o s
+  n u - - - - - -
+
+While these may be equivalent in terms of deriving one from the other,
+they are not equivalent in terms of reconstructing a common ancestor.
+
+(The problems are cognate with an even worse problem in biological
+alignment, so the field is well studied.)
+
+=item derive new weighting/alignment schemes
+
+Thus far, subclasses include only an implementation of the
+Wagner-Fischer (see L<Text::Align::WagnerFischer>) and Levenshtein
+(see L<Text::Align::Levenshtein>) edit distances, and one representing
+a weighting score derived from Covington (see
+L<Text::Align::Covington>).
+
+Having built this powerful abstraction, it is wasted if only three
+classes ever derive from it. Here are some possible directions to
+derive new subclasses (some will require some of the new features
+described above):
+
+=over
+
+=item Feature distance
+
+Several other techniques for calculating the similarity of two
+segments have been proposed.  Two using phonological features include
+C<Ipadist> and C<Editex> (Zobel and Dart
+(L<1995|Text::Align::background/Citations>) and Kondrak's (L<2000,
+2001|Text::Align::background/Citations>) implementation of Somers'
+multi-valued features (see L<Text::Align::background/Citations>).
+
+The analysis of the Covington mapping (see
+L<Text::Align::analysis/Covington>) suggests that phonetic similarity
+plays an important role in accurate alignment. Kondrak's paper
+suggests that Somers' weighting scheme is in fact more powerful.
+
+=item Aligning phonetics with orthography
+
+Alignment is a difficult but common problem when establishing a
+supervised training dataset for most pronunciation-prediction
+engines. For this kind of Operating under those constraints would
+likely require I<context conditioning> and/or I<gap costing>, but
+would undoubtedly be an interesting and useful application.
+
+This would be a great place to explore weighting functions that had
+"handedness" (see L<Text::Align::background/Desiderata>).
+
+=item Derive a "keyboard-distance" subclass
+
+There is a module C<String::KeyboardDistance> available on CPAN, but
+the author does not seem to use a dynamic-programming technique to
+determine such a distance.
+
+=item Biological application
+
+Weighting distances between nucleic acid and amino acid segments are
+well-described. Emulating some of those weighting distances might be
+interesting, and would undoubtedly be a valuable proof of the
+flexibility of the architecture.
+
+=back
+
+=item Learning distances
+
+Given larger datasets, it should be possible to derive alignment
+weights, both supervised and unsupervised. This rather exciting
+possibility might also allow a generalization schema to discover
+regularities in derivational patterns.
+
+Ideally, this system would learn the "handed" weights between two
+languages, for example, starting from some rough guess (phonetic
+similarity) and iterating over the dataset until accuracy on some test
+corpus stops improving.
+
+=back
+
+=head2 Minor "nice-to-have" patches
+
+Coding (or otherwise implementation-focused) projects that range from
+a few hours' work to a few days' work.  All of these listed below are,
+in general, not breaking any new theoretical ground but might make
+doing so easier (e.g., L</improve sensitivity to Unicode IPA>).
+
+=over
+
+=item improve sensitivity to Unicode IPA
+
+For example, I<modifier>-type characters should be considered to be
+part of the previous character when the characters are C<split>.  Current
+workaround -- if a different splitting is required, a listref can be
+handed to the C<new()> class method instead of a string; this listref
+will be assumed to be "pre-split".
+
+It is possible that Perl versions 5.8 and up already do this, since
+Perl 5.8+ is native Unicode.
+
+=item Better testing (larger cognate sets, automatic evaluation)
+
+It would be both productive and interesting to construct a set of test
+data for any prospective alignment algorithm.
+
+For example, it might be interesting to take a known set of cognates
+and ensure that the distance/cost measure provided by the alignment
+algorithm should be lower between "real" cognates than between two
+arbitrarily chosen words from the same language.  Having a measurement
+of just how much lower would also be valuable.
+
+=item Allow as_strings to use zero-length pad
+
+The semantics of this should indicate "no padding". The C<undef> value
+should probably still indicate a warning.
+
+=item Test and document the C<traverse()> emulation of
+C<Algorithm::Diff>
+
+This should not be a difficult project -- most of the code is present
+in the module in an undocumented sub named C<traverse()>, but is
+untested. (Well, it's undocumented except for this item.)
+
+=item Consider a relocation in Perl namespace
+
+As yet, this module is not on CPAN.  It seems that the appropriate
+location may not be under C<Text::Align> but in fact under
+C<Algorithm::Align>, on a parallel with C<Algorithm::Diff>, which is
+essentially an abstraction layer for performing a I<trace> (see
+L<Text::Align::background/Related Perl modules>).
+
+While C<String::Align> is possible, that name, like C<Text::Align>,
+suggests that it only applies to text sequences (rather than any
+arbitrary lists).
+
+More effectively, the CPAN community seems to have decided that the
+C<String::*> namespace is deprecated -- probably because of the
+potential for ambiguity of that namespace. Such ambiguity has been
+resolved by its member modules, which have now mostly emigrated to the
+C<Text::*> and C<Lingua::*> namespaces, depending on their focus
+(string-processing and language processing respectively). No
+C<String::*> modules now ship with the core Perl distribution.
+
+=item "objectify" the internal storage form of a C<pair> object
+
+Currently, the internal storage form for an alignment is as a series
+of pairs (what's returned from the C<pairwise()> method, see
+L<Text::Align/"Instance methods">).  It might make sense to make this an
+object itself, if only as a tidy way of packaging the cost of a
+particular alignment together with the actual alignment itself.
+
+=item compare this module to C<String::Similarity>
+
+=item compare this module to C<Text::DoubleMetaphone>
+
+=item compare this module to C<Text::DoubleMetaphone>
+
+Documentation improvements. Maybe also consider emulating some of
+these behaviors as new derived classes.
+
+=back
+
+=head1 SEE ALSO
+
+=over
+
+=item L<Text::Align>.
+
+=item L<Text::Align::background>.
+
+=item L<Text::Align::analysis>.
+
+=back
+
+=cut
