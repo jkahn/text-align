@@ -2,7 +2,7 @@
 use 5.006;
 use strict;
 use warnings;
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 ##################################################################
 use Carp;
 use utf8; # character semantics, please
@@ -1348,6 +1348,10 @@ Separated out C<Text::Align::Covington> and C<Text::Align::Phone>.
 =item 0.09
 
 added dump_grid method
+
+=item 0.10
+
+added components for separated C<column-align> script.
 
 =back
 
