@@ -9,10 +9,6 @@ Align/background.pod
 Align/analysis.pod
 Align/future.pod
 
-scripts/align_cognates.pl
-scripts/phoneset.dat
-scripts/Covington_cognates.txt
-
 Levenshtein/Levenshtein.pm
 Levenshtein/Makefile.PL
 Levenshtein/test.pl
@@ -20,11 +16,3 @@ Levenshtein/test.pl
 WagnerFischer/WagnerFischer.pm
 WagnerFischer/Makefile.PL
 WagnerFischer/test.pl
-
-Phone/Phone.pm
-Phone/Makefile.PL
-Phone/test.pl
-
-Covington/Covington.pm
-Covington/Makefile.PL
-Covington/test.pl

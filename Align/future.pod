@@ -61,7 +61,7 @@ Thus far, subclasses include only an implementation of the
 Wagner-Fischer (see L<Text::Align::WagnerFischer>) and Levenshtein
 (see L<Text::Align::Levenshtein>) edit distances, and one representing
 a weighting score derived from Covington (see
-L<Text::Align::Covington>).
+L<Text::Align::Covington>, distributed separately).
 
 Having built this powerful abstraction, it is wasted if only three
 classes ever derive from it. Here are some possible directions to

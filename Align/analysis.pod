@@ -18,7 +18,7 @@ IPA.
 
 The corpus as used in this experiment can be found in the
 C<Text::Align> distribution, in the C<scripts> subdirectory, as
-C<scripts/Covington_cognates.txt>.  It is best viewed using a UTF-8
+C<bin/Covington_cognates.txt>.  It is best viewed using a UTF-8
 capable text-editor, with a Unicode-capable font. (Microsoft Internet
 Explorer and Mozilla, will do this without a hitch.)
 

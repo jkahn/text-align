@@ -312,7 +312,7 @@ segments.  Trivial derived classes (like C<Text::Levenshtein>) simply
 return 1 whenever the segments under consideration are different, and
 0 when they are identical.
 
-More sophisticated subclasses, like C<Text::Covington>, rank the
+More sophisticated subclasses, like C<Text::Align::Covington>, rank the
 similarity of two segments based on more complex factors, e.g.:
 
 =over

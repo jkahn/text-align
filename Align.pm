@@ -3,7 +3,7 @@
 use 5.006;
 use strict;
 use warnings;
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 ##################################################################
 use Carp;
 use utf8; # character semantics, please
@@ -1106,9 +1106,13 @@ additional modules from CPAN:
 
 Requires C<Lingua::FeatureMatrix> and C<Class::MethodMaker>.
 
+Note this class (Covington) is distributed separately.
+
 =item Text::Align::Phone
 
 Requires C<Class::MethodMaker>.
+
+Note this class (Phone) is distributed separately.
 
 =back
 
@@ -1161,6 +1165,10 @@ C<reset_class()> clears the id tables
 
 =back
 
+=item 0.08
+
+Separated out C<Text::Align::Covington> and C<Text::Align::Phone>.
+
 =back
 
 =head1 AUTHOR
@@ -1196,6 +1204,8 @@ providing the full suite of C<Text::Align> methods.
 
 A descendant of C<Text::Align> that uses a weighting scheme based on a
 paper by Michael Covington (University of Georgia).
+
+Note (August 2003) this class is now distributed separately.
 
 =item L<Text::Align::background>
 
